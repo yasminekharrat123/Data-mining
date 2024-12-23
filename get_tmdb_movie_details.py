@@ -1,8 +1,9 @@
 import os
-import time
 import csv
+import time
 import requests
 from dotenv import load_dotenv
+import pandas as pd
 
 load_dotenv()
 
@@ -24,7 +25,7 @@ def fetch_movie_details(tconst, api_key):
         
         movie_results = data.get("movie_results", [])
         if movie_results:
-            return movie_results[0] 
+            return movie_results[0]
         else:
             print(f"No movie details found for IMDb ID: {tconst}")
             return None
@@ -33,35 +34,35 @@ def fetch_movie_details(tconst, api_key):
         return None
 
 
-def process_movies(input_file, output_file, api_key, start_id):
-    processing = False  # Flag to track if we've reached the starting point
+def process_movies(input_file, merged_file, api_key):
+    # Load the merged file to get existing IMDb IDs
+    if os.path.exists(merged_file):
+        merged_df = pd.read_csv(merged_file, sep="\t")
+        existing_ids = set(merged_df["imdb_id"])
+    else:
+        existing_ids = set()
+        with open(merged_file, "w", newline="", encoding="utf-8") as outfile:
+            writer = csv.writer(outfile, delimiter="\t")
+            writer.writerow(["imdb_id", "tmdb_id", "title", "overview", "poster_path", "original_language", "genre_ids", "release_date", "popularity"])
 
     with open(input_file, "r", encoding="utf-8") as infile:
         reader = csv.DictReader(infile, delimiter="\t")
-        
-        if not os.path.exists(output_file):
-            with open(output_file, "w", newline="", encoding="utf-8") as outfile:
-                writer = csv.writer(outfile, delimiter="\t")
-                writer.writerow(["imdb_id", "tmdb_id", "title", "overview", "poster_path", "original_language", "genre_ids", "release_date", "popularity"])
-        
+
         for row in reader:
             tconst = row.get("tconst")
             if not tconst:
                 print("Missing tconst in input row. Skipping...")
                 continue
 
-            if tconst == start_id:
-                print(f"Starting processing from IMDb ID: {start_id}")
-                processing = True
-
-            if not processing:
+            if tconst in existing_ids:
+                print(f"IMDb ID {tconst} already exists in the merged file. Skipping...")
                 continue
 
             print(f"Fetching details for IMDb ID: {tconst}")
             movie_details = fetch_movie_details(tconst, api_key)
 
             if movie_details:
-                with open(output_file, "a", newline="", encoding="utf-8") as outfile:
+                with open(merged_file, "a", newline="", encoding="utf-8") as outfile:
                     writer = csv.writer(outfile, delimiter="\t")
                     writer.writerow([
                         tconst, 
@@ -78,9 +79,6 @@ def process_movies(input_file, output_file, api_key, start_id):
             else:
                 print(f"Failed to fetch details for IMDb ID: {tconst}")
 
-            # Add a delay to respect rate limits
-            # time.sleep(0.001)  # 20 ms delay
-
 
 if __name__ == "__main__":
     api_key = os.getenv("TMDB_API_KEY")
@@ -89,9 +87,8 @@ if __name__ == "__main__":
         exit(1)
 
     input_file = "movies.tsv"
-    output_file = "movies_tmdb.tsv"
-    start_id = "tt0379071"  # Starting IMDb ID
+    merged_file = "movies_tmdb_merged.tsv"
 
-    print(f"Starting processing of {input_file} from IMDb ID {start_id}")
-    process_movies(input_file, output_file, api_key, start_id)
-    print(f"Processing complete. Results saved to {output_file}")
+    print(f"Starting processing of {input_file}")
+    process_movies(input_file, merged_file, api_key)
+    print(f"Processing complete. Results saved to {merged_file}")
