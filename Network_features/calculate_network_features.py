@@ -37,25 +37,26 @@ def calculate_average_degree(network, actors):
     
     return sum_degrees / num_actors
 
+
 def calculate_network_heterogeneity(network, actors):
     """Calculate network heterogeneity (average cosine similarity) for a movie's actors."""
-
     num_actors = len(actors)
+    not_found_count = 0  # Track actors not found in the network
 
     if num_actors < 2:
         print("Not enough actors to compute similarity. Returning 0.0.")
-        return 0.0  # Not enough actors to compute similarity
+        return 0.0, not_found_count  # Not enough actors to compute similarity
 
     # Get the collaboration vectors for the actors in the movie
     collaboration_vectors = []
     for actor in actors:
-
         if actor in network.actor_to_idx:
             idx = network.actor_to_idx[actor]
             collaboration_vectors.append(network.adj_matrix[idx])
         else:
             # If an actor is not in the network, use a zero vector
             collaboration_vectors.append(np.zeros(network.adj_matrix.shape[0]))
+            not_found_count += 1  # Increment not-found count
 
     collaboration_vectors = np.array(collaboration_vectors)
 
@@ -65,7 +66,6 @@ def calculate_network_heterogeneity(network, actors):
 
     for i in range(num_actors - 1):
         for j in range(i + 1, num_actors):
-
             # Dot product of the two vectors
             dot_product = np.dot(collaboration_vectors[i], collaboration_vectors[j])
 
@@ -84,10 +84,10 @@ def calculate_network_heterogeneity(network, actors):
 
     # Average cosine similarity
     if num_pairs == 0:
-        return 0.0
+        return 0.0, not_found_count
 
     result = total_similarity / num_pairs
-    return result
+    return result, not_found_count
 
 def load_and_preprocess_data(snapshot_file_path):
     """Load and preprocess the snapshot dataset."""
@@ -128,13 +128,14 @@ def calculate_movie_features(snapshot_df, start_year=2000, end_year=2024):
             
             # Calculate features
             avg_degree = calculate_average_degree(network, actors)
-            heterogeneity = calculate_network_heterogeneity(network, actors)
+            heterogeneity, heterogeneity_not_found = calculate_network_heterogeneity(network, actors)
             
             features.append({
                 'movie_id': movie_id,
                 'year': year,
                 'average_degree': avg_degree,
-                'network_heterogeneity': heterogeneity
+                'network_heterogeneity': heterogeneity,
+                'not_found': heterogeneity_not_found
             })
     
     return pd.DataFrame(features)
