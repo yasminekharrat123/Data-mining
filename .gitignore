@@ -2,4 +2,4 @@
 *.tsv
 network_data
 network_data_directors
-
+*.ipynb_checkpoints
