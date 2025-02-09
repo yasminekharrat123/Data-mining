@@ -1,3 +1,5 @@
 .env
 *.tsv
 network_data
+network_data_directors
+
